@@ -57,4 +57,5 @@ data
 /dist/
 *.py~
 *.pyc~
-
+__pycache__
+.metadata
