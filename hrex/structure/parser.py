@@ -13,31 +13,33 @@ class ParserInterface(object):
     """
     Interface to classes that extract content from parsed files.
     """
-    def __init__(self, content='NounPhrases', mode='word', filetype='.parsed'):
+    def __init__(self, extract='NounPhrases', mode='word'):
         """
         Initiate the elements of the class.
         
         Parameters:
         -----------
-        content: specifies the type of content to be extracted
-            NounPhrases: returns the content from self.nounPhrases()
-            PlainPhrase: return the content from self.plainPhrase()
-            ListOfTerms: returns the content from self.listOfTerms()
-            ContentWords: returns the content from self.contentWords()
-        mode: specifies the mode of deal with elements
-        mode : {'reduced', 'complete', 'r', 'raw', 'full', 'economic'}, optional
+        extract : string {'WordsAndTags','Tree','Deps'}, optional
+            specifies the type of content to be extracted
+                WordsAndTags: returns the content from self.getPhrase()
+                Tree: returns the content from self.getTree()
+                Deps: returns the content from self.getDeps()
+        mode : {'word', 'lemma'}, optional
+            Specifies the mode of dealing with elements.
             word: words are extracted
             lemma: lemmas are extracted
-        filetype: the extension of the accepted files (e.g. .xml, .parsed)
 
         Notes:
         ------
-        self.phrase: retains each phrase of the corpus when iterating
-        self.tree: retains the parsed tree of the phrase when iterating
-        self.deps: retains the parsed dependencies of the phrase when iterating
+        self.phrase: array_like
+            retains each phrase of the corpus when iterating
+        self.tree: array_like
+            retains the parsed tree of the phrase when iterating
+        self.deps: array_like
+            retains the parsed dependencies of the phrase when iterating
         """ 
+        self.extract = extract
         self.mode = mode
-        self.filetype = filetype
         self.phrase = ''
         self.tree = ''
         self.deps = []
@@ -54,8 +56,8 @@ class ParserInterface(object):
 
     def getPhrase(self):
         """
-        Returns
-        -------
+        Returns:
+        --------
         self.phrase : array_like
             The content of self.phrase
         """
@@ -64,8 +66,8 @@ class ParserInterface(object):
 
     def getTree(self):
         """
-        Returns
-        -------
+        Returns:
+        --------
         self.tree : array_like
             The content of self.tree
         """
@@ -74,8 +76,8 @@ class ParserInterface(object):
 
     def getDeps(self):
         """
-        Returns
-        -------
+        Returns:
+        --------
         self.deps : array_like
             The content of self.deps
         """
@@ -84,23 +86,50 @@ class ParserInterface(object):
 
     def _normalization(self, term):
         """
-        Transform PoS tags from self.phrase into its simplified version.
-            Original tags: ['NN', 'NNS', 'NNP', 'NNPS']
-            Normalized: ['n']
-            Original tags: ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']
-            Normalized: ['v']
+        Transform PoS tags from a term into its simplified version.
 
         Parameters:
         -----------
-        term : namedtuple
-            Namedtuple containing the word and PoS tag as:
-            Term(word=u'Minute', pos=u'NN')
+        pos : string
+            String containing the PoS tag
 
-        Returns
-        -------
-        phrase : namedtuple
-            Namedtuple containing the word and PoS normalized as:
-            Term(word=u'Minute', pos=u'n')
+        Returns:
+        --------
+        pos : string
+            Returns the normalized form of the string (in case)
+
+        Examples:
+        ---------
+        >>> Stanford()._normalization('NN')
+            n
+        >>> Stanford()._normalization('VBG')
+            v
+        """ 
+        pass
+
+
+    def _contentPos(self, pos, content='nvj'):
+        """
+        Verify wether a PoS tags belongs to a content word or not.
+
+        Parameters:
+        -----------
+        pos : string
+            String containing the PoS tag
+        content : string {'nvjp', 'nvj', 'nv', 'n', 'vjp', ..., 'j'}
+            A identifier to the content words to be extracted
+
+        Returns:
+        --------
+        pos : boolean {True, False}
+            True to a PoS that is from a content word, otherwise False
+
+        Examples:
+        ---------
+        >>> Stanford()._contentPos('v', content='nvj')
+            True
+        >>> Stanford()._contentPos('DT', content='nvj')
+            False
         """ 
         pass
 
@@ -111,19 +140,19 @@ class ParserInterface(object):
 
         Parameters:
         -----------
-        content_words : string 
+        content_words : boolean {True, False}, optional
             Remove non-content words from the phrase.
-        ctw : string 
+        ctw : string {'npjv', 'npj', 'np', 'nj', 'n', ..., 'j'}, optional 
             The content words that should be extracted by `content_words=True`, being:
                 n = nouns
                 p = pronouns
                 j = adjectives
                 v = verbs
-        normalize : binary {True|False}
+        normalize : boolean {True|False}, optional
             calls self._normalization()
 
-        Returns
-        -------
+        Returns:
+        --------
         phrase : array_like
             Return namedtuple objects containing elements of the phrase
                 [Term(word=u'Minute', pos=u'JJ'),
@@ -138,43 +167,74 @@ class ParserInterface(object):
 
     def nounPhrases(self):
         """
-        Return all the noun phrases of the phrase. Nestled noun phrases should
-        also be extracted. Thus, the content of:
-            (NP (NP (DT a) (NN game)) (PP (IN in) (NP (NN hand))))
-        should be extracted as:
-            [NP(id=1, np='a game', head='game'),
-             NP(id=2, np='hand', head='hand'),
-             NP(id=3, np='a game in hand', head='game')
+        Extract the noun phrases of the sentence.
+
+        Returns:
+        --------
+        lnp : array_like
+            List of all noun phrases in the sentence. Nestled noun phrases
+            are also extracted. 
+
+        Examples:
+        --------
+        >>> Parser().phrase = '(NP (NP (DT a) (NN game)) (PP (IN in) (NP (NN hand))))'
+        >>> Parser().nounPhrases()
+            [NP(id=1, np=[(DT a), (NN game)], head='game'),
+             NP(id=2, np=[(NN hand)], head='hand'),
+             NP(id=3, np=[(DT a), (NN game), (IN in), (NN hand)], head='game')
             ]
-        where NP is a `namedtuple('NP', ['id', 'np', 'head'])`
         """
         pass
 
 
     def plainPhrase(self):
         """
-        Return a string with the plain text of the phrase. 
-        The phrase does not contain the part of speech tags.
-        E.g. the phrase: [(DT The), (RB newly), (VBN installed), 
-                          (JJ video), (NNP surveillance), (NN system)]
-        Returns: 'The newly installed video surveillance system'
+        Extract the conent of the phrase
+
+        Returns:
+        --------
+        phrase : string
+            Return a string with the plain text of the phrase. 
+            The phrase does not contain the part of speech tags.
+
+        Examples:
+        ---------
+        >>> Parser().phrase = 'The/DT newly/RB installed/VBN video/JJ
+                                 surveillance/NNP system/NN ./.'
+        >>> Parser().plainPhrase()
+            'The newly installed video surveillance system .'
         """
         pass
 
 
     def contentWords(self, ctw='njvp'):
         """
-        Return a list containing only content words in self.phrase. 
-        ctw: The content words that should be extracted, being:
-            n = nouns
-            p = pronouns
-            j = adjectives
-            v = verbs
+        Extract content words of the phrase (i.e., words that contain
+        some meaning such as nouns, proper nouns, verbs and adjectives.
+        To extract content words, the phrase must be transformed by
+        ``listOfTerms`` and normalized.
 
-        For an input in the form:
-            [(DT The), (RB newly), (VBN installed), (JJ video), (NNP surveillance), (NN system)]
-        The output list has the form of:
-            [(VBN installed), (JJ video), (NNP surveillance), (NN system)]
+        Parameters:
+        -----------
+        ctw: string {'npjv', 'npj', 'np', 'nj', 'n', ..., 'j'}, optional 
+            The content words that should be extracted, being:
+                n = nouns
+                p = pronouns
+                j = adjectives
+                v = verbs
+
+        Returns:
+        --------
+        cwords = array_like
+            Return a list containing only content words in self.phrase. 
+            
+
+        Examples:
+        ---------
+        >>> p=[(DT The), (RB newly), (v installed), 
+               (j video), (n surveillance), (n system)]
+        >>> Parser(p).contentWords(ctw='n')
+            [(n surveillance), (n system)]
         """
         pass
 #End of class ParserInterface
