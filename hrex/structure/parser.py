@@ -237,6 +237,38 @@ class ParserInterface(object):
             [(n surveillance), (n system)]
         """
         pass
+
+
+    def document(self, content_words=True, ctw='njv', normalize=True):
+        """
+        Extracts the whole document as a list of terms. No sentence border is
+        added. This should be used when extracting a window using small documents.
+
+        Parameters:
+        -----------
+        content_words : boolean {True, False}, optional
+            Remove non-content words from the phrase.
+        ctw : string {'npjv', 'npj', 'np', 'nj', 'n', ..., 'j'}, optional 
+            The content words that should be extracted by `content_words=True`, being:
+                n = nouns
+                p = pronouns
+                j = adjectives
+                v = verbs
+        normalize : boolean {True|False}, optional
+            calls self._normalization()
+
+        Returns:
+        --------
+        document : array_like
+            Return namedtuple objects containing all elements of the document
+                [Term(word=u'Minute', pos=u'JJ'),
+                Term(word=u'bubbles', pos=u'NNS'),
+                Term(word=u'of', pos=u'IN'),
+                Term(word=u'ancient', pos=u'JJ'),
+                Term(word=u'air', pos=u'NN')]
+            where `Term` is a `namedtuple('Term', ['word', 'pos'])`
+        """
+        pass
 #End of class ParserInterface
 
 

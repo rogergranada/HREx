@@ -184,7 +184,7 @@ class Stanford(ParserInterface):
         return False
 
 
-    def listOfTerms(self, content_words=True, ctw='njv', normalize=True):
+    def listOfTerms(self, content_words=True, ctw='njv', normalize=True, lower=False):
         """
         Transform the elements of the phrase into a list of nametuples.            
 
@@ -198,8 +198,10 @@ class Stanford(ParserInterface):
                 p = pronouns
                 j = adjectives
                 v = verbs
-        normalize : boolean {True|False}, optional
+        normalize : boolean {True, False}, optional
             calls self._normalization()
+        lower : boolean {True, False}, optional
+            Transform word to lowecase
 
         Returns:
         --------
@@ -219,6 +221,8 @@ class Stanford(ParserInterface):
                 word = ar[0]
             else:
                 word = '/'.join(ar[:-1])
+            if lower:
+                word = word.lower()
             pos = ar[-1]
             if normalize:
                 pos = self._normalization(pos)
@@ -354,3 +358,40 @@ class Stanford(ParserInterface):
         if not ctw:
             raise ValueError, 'a content word must be passed as argument'
         return self.listOfTerms(content_words=True, ctw=ctw, normalize=True)
+
+
+    def document(self, content_words=True, ctw='njv', normalize=True, lower=False):
+        """
+        Extracts the whole document as a list of terms. No sentence border is
+        added. This should be used when extracting a window using small documents.
+
+        Parameters:
+        -----------
+        content_words : boolean {True, False}, optional
+            Remove non-content words from the phrase.
+        ctw : string {'npjv', 'npj', 'np', 'nj', 'n', ..., 'j'}, optional 
+            The content words that should be extracted by `content_words=True`, being:
+                n = nouns
+                p = pronouns
+                j = adjectives
+                v = verbs
+        normalize : boolean {True|False}, optional
+            calls self._normalization()
+        lower : boolean {True, False}, optional
+            Transform word to lowecase
+
+        Returns:
+        --------
+        document : array_like
+            Return namedtuple objects containing all elements of the document
+                [Term(word=u'Minute', pos=u'JJ'),
+                Term(word=u'bubbles', pos=u'NNS'),
+                Term(word=u'of', pos=u'IN'),
+                Term(word=u'ancient', pos=u'JJ'),
+                Term(word=u'air', pos=u'NN')]
+            where `Term` is a `namedtuple('Term', ['word', 'pos'])`
+        """
+        doc = []
+        for _ in self.__iter__():
+            doc.extend(self.listOfTerms(content_words, ctw, normalize, lower))
+        return doc
