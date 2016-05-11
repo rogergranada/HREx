@@ -42,18 +42,16 @@ class Corpus(object):
         self.dctxs : DicWords
             Dictionary of the contexts in the form
                 context: (id, freq)
-        self.drels : defaultdict(int)
+        self.drels : DictRels
             Dictionary containing the relations between words 
             and contexts. This dictionary has the form:
                 (idw, idc): freq
         """
         self.dirin = dirin
-        self.fout = fout
-        self.outmode = outmode
 
         self.dwords = dictionaries.DictWords()
         self.dctxs = dictionaries.DictWords()
-        self.drels = defaultdict(int)
+        self.drels = dictionaries.DictRels()
 
     def _window(self, doc):
         """
@@ -168,7 +166,7 @@ class Corpus(object):
             sys.exit(1)
 
 
-    def save(self, fout, mode='db'):
+    def save(self, fout, mode='db', new=True):
         """
         Save the dictionaries of words, contexts and relations between
         words and contexts. More specifically, save the content of 
@@ -180,17 +178,28 @@ class Corpus(object):
             The path to the file where the content is stored
         mode : string {'db', 'shelve'}
             The mode in which the output is saved
+        new : Boolean {True, False}, optional
+            Save the dictionary into an empty file
         """
-        if mode == 'db':
-            from structure.databases import SQLite
-            db = SQLite(fout)
-            db.saveDictionary(dwords, dtype='words', new=True)
-            db.saveDictionary(dctxs, dtype='contexts', new=True)
-            db.saveDictionary(drels, dtype='relations', new=True)
-            db.close()
-        elif mode == 'shelve':
-            
-        else:
-            logger.error('saving mode "%s" not implemented' % mode)
-            sys.exit(1)
+        self.dwords.save(fout, dname='dwords', mode=mode, new=new)
+        self.dctxs.save(fout, dname='dctxs', mode=mode)
+        self.drels.save(fout, dname='drels', mode=mode)
 
+
+    def load(self, fin, mode='db'):
+        """
+        Load the dictionaries of words, contexts and relations between
+        words and contexts. More specifically, load the content to the
+        dictionaries self.dwords, self.dctxs and self.rels.
+
+        Parameters:
+        -----------
+        fin : string
+            The path to the file where the content is stored
+        mode : string {'db', 'shelve'}
+            The mode in which the output is loaded
+        """
+        self.dwords.load(fin, dname='dwords', mode=mode)
+        self.dctxs.load(fin, dname='dctxs', mode=mode)
+        self.drels.load(fin, dname='drels', mode=mode)
+        print self.dwords

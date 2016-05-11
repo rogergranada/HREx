@@ -6,6 +6,8 @@ This module contains an abstract class to methods. This class should be
 inherited by classes that implement a method to extract hierarchical
 relations.
 
+A method starts from a list of words, contexts and their frequencies
+
 @author: granada
 """
 

@@ -16,13 +16,13 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 
 from collections import defaultdict
 
-from database import SQLite, Shelve
+from storage import SQLite, Shelve, PlainText
 
 import operator
 from collections import Counter
 from codecs import open
 from os.path import join
-          
+
 
 class DictList(dict):
     """
@@ -115,15 +115,12 @@ class DictList(dict):
         logger.info('loading dictionary: %s' % dbname)
         db = shelve.open(fname)
         dict.__init__(self, DictList(db[dic]))
-
 #End of class DictList
 
 
-class DictWords(dict):
+class AbstractDictionary(dict):
     """
-    DicWords is a dictionary for words and contexts. It contains the ID 
-    and the frequency of each word. It has the form:
-        [word]: (id, freq)
+    Class to implement shared functions
     """
     def __init__(self, input=None):
         """
@@ -139,6 +136,152 @@ class DictWords(dict):
             dict.__init__(self, input)
         else:
             dict.__init__(self)
+
+
+    def id2key(self, simplify=False):
+        """
+        Invert the dictionary, transforming the key into id and 
+        the id into key.
+
+        Parameters:
+        -----------
+        simplify : boolean {True, False}, optional
+            Return a instance of `dict` instead of an instance
+            of the class
+
+        Returns:
+        --------
+        self.dic_t : dict or DictWords instance
+            The dictionary containing the id as key and the word 
+            as value.
+
+        **This method must be implemented by each class**
+        """
+        pass
+
+
+    def simplify(self, transposed=False):
+        """
+        Simplify transforms each namedtuple into a normal tuple.
+
+        Parameters:
+        -----------
+        transposed : boolean {True, False}, optional
+            Transform keys into ids and ids into keys
+
+        Returns:
+        --------
+        intance of dict
+            Dictionary of inverse dictionary
+
+        Examples:
+        ---------
+        >>> d = DictWords({'w1': (1,1), 'w2':(2,4), 'w3':(3,5)})
+        >>> isinstance(d.simplify(), dict)
+            True
+        >>> d.simplify(transposed=True)
+            {1: ('w1',1), 2:('w2',4), 3:('w3',5)}
+
+        >>> d = DictRels({(1,2): 1, (1,3): 2, (2,3): 3})
+        >>> isinstance(d.simplify(), dict)
+            True
+        >>> d.simplify(transposed=True)
+            {(2, 1): 1, (3, 1): 2, (3, 2): 3}
+        """
+        if transposed:
+            return dict(self.id2key())
+        else:
+            return dict(self.copy())
+
+
+    def save(self, fout, dname=None, mode='db', new=False):
+        """
+        Save the dictionary into `fout`.
+
+        Parameters:
+        -----------
+        fout : string
+            The path to the output file
+        dname : string {'dwords','dctxs', 'drels'}
+            The name of the dictionary
+        mode : string {'text', 'db', 'shelve'}
+        """
+        if mode == 'db':
+            dbm = SQLite(fout)
+        elif mode == 'shelve':
+            dbm = Shelve(fout)
+            if new:
+                dbm.clear()
+        elif mode == 'text':
+            ftxt = PlainText(fout)
+            comm = '%%word id frequency'
+            ftxt.save(self, dtype=dname, transposed=False)
+            return True
+        else:
+            logger.error('Cannot save dictionary - `mode=%s` no specified' % mode)
+            return False
+        dbm.save(self, dtype=dname)
+        dbm.close()
+        return True
+
+
+    def load(self, fin, dname=None, mode='db'):
+        """
+        Load the dictionary from `fin`.
+
+        Parameters:
+        -----------
+        fin : string
+            The path to the input file
+        dname : string {'dwords','dctxs', 'drels'}
+            The name of the dictionary
+        mode : string {'text', 'db', 'shelve'}
+        """
+        if mode == 'db':
+            dbm = SQLite(fin)
+        elif mode == 'shelve':
+            dbm = Shelve(fin)
+        elif mode == 'text':
+            dbm = PlainText(fin)
+            dic = dbm.load(dtype=dname, transposed=False)
+            dict.__init__(self, dic)
+            dbm.close()
+            return True
+        else:
+            logger.error('Cannot load dictionary - `mode=%s` no specified' % mode)
+            return False
+        dic = dbm.load(self, dtype=dname)
+        dict.__init__(self, dic)
+        dbm.close()
+        return True
+
+    def stats(self):
+        """
+        Print stats about the dictionary.
+        """
+        logger.info('dictionary conaining %d terms' % len(dict.keys(self)))
+#End of AbstractDictionary
+
+
+class DictWords(AbstractDictionary):
+    """
+    DicWords is a dictionary for words and contexts. It contains the ID 
+    and the frequency of each word. It has the form:
+        [word]: (id, freq)
+    """
+    def __init__(self, input=None):
+        """
+        Initiate the class SQLite.
+
+        Parameters:
+        -----------
+        input : string, optional
+            A dictionary that is transformed into DictWords
+        """
+        if input:
+            AbstractDictionary.__init__(self, input=input)
+        else:
+            AbstractDictionary.__init__(self, input=input)
             self.id = 1
 
 
@@ -178,43 +321,6 @@ class DictWords(dict):
                 self.id += 1
 
 
-    def __getitem__(self, key):
-        """
-        Returns:
-        --------
-        The value of the key, without the frequency.
-        """
-        return dict.__getitem__(self, key)
-
-
-    def simplify(self, transposed=False):
-        """
-        Simplify transforms each namedtuple into a normal tuple.
-
-        Parameters:
-        -----------
-        transposed : boolean {True, False}, optional
-            Transform keys into ids and ids into keys
-
-        Returns:
-        --------
-        intance of dict
-            Dictionary of inverse dictionary
-
-        Examples:
-        ---------
-        >>> d = DictWords({'w1': (1,1), 'w2':(2,4), 'w3':(3,5)})
-        >>> isinstance(d.simplify(), dict)
-            True
-        >>> d.simplify(transposed=True)
-            {1: ('w1',1), 2:('w2',4), 3:('w3',5)}
-        """
-        if transposed:
-            return dict(self.id2key())
-        else:
-            return dict(self.copy())
-
-
     def id2key(self, simplify=False):
         """
         Invert the dictionary, transforming the key into id and 
@@ -241,6 +347,44 @@ class DictWords(dict):
             return self.dict_t.simplify()
         else:
             return self.dict_t
+
+
+    def dic2Tuples(self, key='id'):
+        """
+        Return the dictionary in form of tuples.
+
+        Parameters:
+        -----------
+        key : string {'id', 'word'}
+            Define the element to be the key (first element of the
+            tuple).
+        
+        Returns:
+        --------
+        ld = array_like
+            A list containing all tuples from the dictionary
+
+        Examples:
+        ---------
+        >>> d = DictWords({'w1': (1,1), 'w2':(2,4), 'w3':(3,5)})
+        >>> d.dic2Tuples(key='id')
+            [(1, 'w1', 1),(2, 'w2', 4),(3, 'w3', 5)]
+        >>> d.dic2Tuples(key='word')
+            [('w1', 1, 1),('w2', 2, 4),('w3', 3, 5)]
+        """
+        if key not in ['id', 'word']:
+            logger.error('there is no such key in the dictionary: %s' % key)
+            return False
+
+        tuples = []
+        for w in dict.iterkeys(self):
+            t, f = dict.__getitem__(self, w)
+            if key == 'id':
+                tuples.append((t, w, f))
+            elif key == 'word':
+                tuples.append((w, t, f))
+        return tuples
+
 
     def has_id(self, id):
         """
@@ -321,38 +465,144 @@ class DictWords(dict):
             else:
                 f = None
         return f
+#End of class DictWords
 
 
-    def save_as_text(self, fname, head='', transposed=False):
+class DictRels(AbstractDictionary):
+    """
+    DictRels is a dictionary for store relations betweeen words and contexts. 
+    It contains the ID of the word, the ID of the context and the frequency
+    of the occurrence of both. It has the form:
+        (idw, idc): freq
+    """
+    def __init__(self, input=None):
         """
-        Save dictionary in a plain text file. 
+        Initiate the class SQLite.
 
         Parameters:
         -----------
-        fname : string
-            The path to the output file
-        head : string, optional
-            Records the first line of the file, usually to describe 
-            the type of data, such as: %%word id frequency
+        input : string, optional
+            A dictionary that is transformed into DictWords
+        """
+        AbstractDictionary.__init__(self, input=input)
+
+
+    def __setitem__(self, key, value):
+        """
+        Add element to the dictionary. The frequency is summed up 
+        each time the same key is added.
+
+        Parameters:
+        -----------
+        key : tuple
+            A pair of ids (idw, idc)
+        value: int
+            The frequency of the pair key
+
+        Examples:
+        ---------
+        >>> d = DictRels()
+        >>> d[(1, 2)] = 1
+            {(1, 2): 1}
+        >>> d[(1, 2)] = 4
+            {(1, 2): 5}
+        """
+        if dict.has_key(self, key):
+            f = dict.__getitem__(self, key)
+            dict.__setitem__(self, key, f+value)
+        else:
+            dict.__setitem__(self, key, value)
+
+
+    def id2key(self, simplify=False):
+        """
+        Invert the dictionary, transforming the first key into 
+        the second and vice versa.
+
+        Parameters:
+        -----------
+        simplify : boolean {True, False}, optional
+            Return a instance of `dict` instead of an instance
+            of the class
+
+        Returns:
+        --------
+        self.dic_t : dict or DictRels instance
+            The dictionary containing the id as key and the word 
+            as value.
+        """
+        if not self.dict_t:
+            self.dict_t = DicRels()
+            for key in dict.iterkeys(self):
+                idw, idc = key
+                f = dict.__getitem__(self, key)
+                self.dict_t[(idc, idw)] = f
+        if simplify:
+            return self.dict_t.simplify()
+        else:
+            return self.dict_t
+
+
+    def dic2Tuples(self, key='idw', transposed=False):
+        """
+        Return the dictionary in form of tuples.
+
+        Parameters:
+        -----------
+        key : string {'idw', 'idc'}
+            Choose the element to be the first element of the tuple
         transposed : boolean {True, False}, optional
             Transform keys into ids and ids into keys
+
+        Returns:
+        --------
+        ld = array_like
+            A list containing all tuples from the dictionary
+
+        Notes:
+        ------
+        Using `key='idc'` is equal to use transposed=True
+
+        Examples:
+        ---------
+        >>> d = DictRels({(1,2): 1, (1,3): 2, (2,3): 3})
+        >>> d.dic2Tuples(transposed=False)
+            [(1, 2, 1),(1, 3, 2),(2, 3, 3)]
+        >>> d.dic2Tuples(transposed=True)
+            [(2, 1, 1),(3, 1, 2),(3, 2, 3)]
         """
-        logger.info('Saving data to file dictionary file at: %s' % fname)
-        
-        with open(fname, 'w', 'utf-8') as fout:
-            if head:
-                fout.write('%s\n' % head)
-            for word, values in sorted(dic.items(), key=operator.itemgetter(1)):
-                val_1, f = values
-                if isinstance(f, int):
-                    fout.write('%d %s %d\n' % (val_1, word, f))
-                else:
-                    fout.write('%d %s %f\n' % (val_1, word, f))
+        tuples = []
+        for key in dict.iterkeys(self):
+            idw, idc = key
+            f = dict.__getitem__(self, key)
+            if transposed or id == 'idc':
+                tuples.append((idc, idw, f))
+            else:
+                tuples.append((idw, idc, f))
+        return tuples
 
 
-    def stats(self):
+    def setfreq(self, key, newf):
         """
-        Print stats about the dictionary.
+        Change the value of the `freq` for a certain key. 
+
+        Parameters:
+        -----------
+        key : int, string
+            The key of the dictionary
+        newf : int, float
+            The new value for the frequency
         """
-        logger.info('dictionary conaining %d terms' % len(dict.keys(self)))
+        if dict.has_key(self, key):
+            dict.__setitem__(self, key, newf)
+        else:
+            logger.error('there is no such key in the dictionary: %r' % key)
+
+
+    def getfreq(self, key):
+        """
+        Return the frequency of a certain key.
+        """
+        return self.__getitem__(key)
+
 #End of class DictWords
