@@ -24,7 +24,7 @@ class Corpus(object):
     Transforms the content of files in a more computational representation
     (Matrix Market representation).
     """
-    def __init__(self, dirin):
+    def __init__(self, dirin, lang='en', parser='Stanford', filetype='.parsed'):
         """
         Initialize the class to generate a Matrix Market representation 
         of the corpus.
@@ -33,6 +33,15 @@ class Corpus(object):
         -----------
         dirin : string
             The path to the folder containing the input files
+       lang : string
+            The language of the input files. This is important to parsers that
+            can generate files in more than one language. E.g, Treetagger may 
+            generate relations for English, French, Portuguese etc.
+        parser : string
+            The name of the parser used to generate the input files.
+        filetype : string
+            The extension of the input files. The extension avoids trying to parse non
+            parsed files that are in the same folder or backup files (`.parsed~`)
 
         Notes:
         ------
@@ -48,29 +57,78 @@ class Corpus(object):
                 (idw, idc): freq
         """
         self.dirin = dirin
+        self.docs = []
+        if lang == 'en':
+            if parser == 'Stanford':
+                from stanford import Stanford
+                self.Parser = Stanford
+                parsedfiles = os.listdir(self.dirin)
+                for filename in sorted(parsedfiles):
+                    name, ext = splitext(filename)
+                    if ext.endswith(filetype):
+                        self.docs.append(filename)
 
         self.dwords = dictionaries.DictWords()
         self.dctxs = dictionaries.DictWords()
         self.drels = dictionaries.DictRels()
 
-    def _window(self, doc):
+
+    def _documents(self, lex_mode='word', cwords=True, ctw='njv', normalize=True, lower=False):
         """
-        Extract the content in a window of size `size`.
+        Extract the content from a list of documents yielding each document at time.
 
         Parameters:
         -----------
-        Parser : Instance of a Parser
-            This is the instance of some of the implemented parsers
+        lex_mode : string {'word','lemma'}
+            The type of lexical elements that are extracted.
+        cwords : boolean {True, False}
+            True in case of extracting only content words, False otherwise
+        ctw : string {'npjv', 'npj', 'np', 'nj', 'n', ..., 'j'}, optional 
+            The content words that should be extracted by `content_words=True`, being:
+                n = nouns
+                p = pronouns
+                j = adjectives
+                v = verbs
+        normalize : boolean {True|False}, optional
+            True in case of apply normalization to the terms, False otherwise
+        lower : boolean {True, False}, optional
+            Transform word to lowecase
+
+        Yields:
+        -------
+        doc : array_like
+            A list containing all terms of the document
+        """
+        for filename in self.docs:
+            parser = self.Parser(join(self.dirin, filename), extract='WordsAndTags')
+            content = parser.document(content_words=cwords, ctw=ctw, normalize=normalize, lower=lower)
+            yield content
+
+
+    def extractWindow(self, size=5, lex_mode='word', cwords=True, ctw='njv', normalize=True, lower=False):
+        """
+        Extract terms from the corpus using a window size equals to `size`.
+
+        Parameters:
+        -----------
+        size : integer
+            The size of the window that the content is extracted. E.g., ``size=5``
+            means a window with two words before and two words after the target word.
 
         Notes:
         ------
-        Contexts are extracted as `word#pos-r` if the context is on
-        the left of the target word and `word#pos-l` is the context
-        is on the right of the target word. Target word is represented
-        as `tword` and context word is represented as  `cword`.          
+        Contexts are extracted as `word#pos-r` if the context is on the left of the 
+        target word and `word#pos-l` is the context is on the right of the target word. 
+        Target word is represented as `tword` and context word is represented as  `cword`. 
         """
-        if isinstance(self.window, int) or self.window.isdigit():
-            n = (int(self.window)-1)/2
+        d = self._documents(lex_mode, cwords, ctw, normalize, lower)
+        doc = []
+        for content in d:
+            doc.extend(content)
+
+        # create self.dwords, self.dctxs and self.drels
+        if isinstance(size, int) or size.isdigit():
+            n = (int(size)-1)/2
         else:
             n = len(doc)
 
@@ -113,57 +171,40 @@ class Corpus(object):
                         self.drels[(idt, idc)] = 1
 
 
-
-    def extractWindow(self, lang='en', parser='Stanford', filetype='.parsed', 
-                      lex_mode='word', size=5, cwords=True, ctw='njv', normalize=True,
-                      lower=False):
+    def extractDocument(self, lex_mode='word', cwords=True, ctw='n', normalize=True, lower=False):
         """
-        Extract terms from the corpus using a window size equals to `size`.
+        Extract terms from the corpus using the whole document as window of cooccurrences.
 
-        Parameters:
-        -----------
-        lang : string
-            The language of the input files. This is important to parsers that
-            can generate files in more than one language. E.g, Treetagger may 
-            generate relations for English, French, Portuguese etc.
-        parser : string
-            The name of the parser used to generate the input files.
-        filetype : string
-            The extension of the input files. The extension avoids trying to parse non
-            parsed files that are in the same folder or backup files (`.parsed~`)
-        lex_mode : string {'word','lemma'}
-            The type of lexical elements that are extracted.
-        size : integer
-            The size of the window that the content is extracted. E.g., ``size=5``
-            means a window with two words before and two words after the target word.
-        cwords : boolean {True, False}
-            True in case of extracting only content words, False otherwise
-        ctw : string {'npjv', 'npj', 'np', 'nj', 'n', ..., 'j'}, optional 
-            The content words that should be extracted by `content_words=True`, being:
-                n = nouns
-                p = pronouns
-                j = adjectives
-                v = verbs
-        normalize : boolean {True|False}, optional
-            True in case of apply normalization to the terms, False otherwise
-        lower : boolean {True, False}, optional
-            Transform word to lowecase
         """
-        self.window = size
-        if lang == 'en':
-            if parser == 'Stanford':
-                from stanford import Stanford
-                parsedfiles = os.listdir(self.dirin)
-                for filename in sorted(parsedfiles):
-                    name, ext = splitext(filename)
-                    if ext.endswith(filetype):
-                        parser = Stanford(join(self.dirin, filename), extract='WordsAndTags')
-                        doc = parser.document(content_words=cwords, ctw=ctw, normalize=normalize, lower=lower)
-                        # create self.dwords, self.dctxs and self.drels
-                        self._window(doc)
-        else:
-            logger.error('language "%s" not implemented' % lang)
-            sys.exit(1)
+        d = self._documents(lex_mode, cwords, ctw, normalize, lower)
+        doc = []
+        for iddoc, content in enumerate(d):
+            for term, pos in content:
+                self.dwords[term] = 1
+                self.dctxs[iddoc] = 1
+                idt, _ = self.dwords[term]
+                idc, _ = self.dctxs[iddoc]
+                self.drels[(idt, idc)] = 1
+        print self.drels
+
+
+    def extractSentences(self, lex_mode='word', cwords=True, ctw='n', normalize=True, lower=False):
+        """
+        Extract terms from the corpus using the whole document as window of cooccurrences.
+
+        """
+        idsent = 0
+        for filename in self.docs:
+            parser = self.Parser(join(self.dirin, filename), extract='WordsAndTags')
+            for _ in parser:
+                content = parser.listOfTerms(content_words=cwords, ctw=ctw, normalize=normalize, lower=lower)
+                for term, pos in content:
+                    self.dwords[term] = 1
+                    self.dctxs[idsent] = 1
+                    idt, _ = self.dwords[term]
+                    idc, _ = self.dctxs[idsent]
+                    self.drels[(idt, idc)] = 1
+                idsent += 1
 
 
     def save(self, fout, mode='db', new=True):
@@ -203,3 +244,4 @@ class Corpus(object):
         self.dctxs.load(fin, dname='dctxs', mode=mode)
         self.drels.load(fin, dname='drels', mode=mode)
         print self.dwords
+#End of class Corpus

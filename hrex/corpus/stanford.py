@@ -395,3 +395,39 @@ class Stanford(ParserInterface):
         for _ in self.__iter__():
             doc.extend(self.listOfTerms(content_words, ctw, normalize, lower))
         return doc
+
+
+    def sentence(self, content_words=True, ctw='njv', normalize=True, lower=False):
+        """
+        Extracts the content of each sentence as a list of terms.
+
+        Parameters:
+        -----------
+        content_words : boolean {True, False}, optional
+            Remove non-content words from the phrase.
+        ctw : string {'npjv', 'npj', 'np', 'nj', 'n', ..., 'j'}, optional 
+            The content words that should be extracted by `content_words=True`, being:
+                n = nouns
+                p = pronouns
+                j = adjectives
+                v = verbs
+        normalize : boolean {True|False}, optional
+            calls self._normalization()
+        lower : boolean {True, False}, optional
+            Transform word to lowecase
+
+        Returns:
+        --------
+        sentence : array_like
+            Return namedtuple objects containing all elements of the sentence
+                [Term(word=u'Minute', pos=u'JJ'),
+                Term(word=u'bubbles', pos=u'NNS'),
+                Term(word=u'of', pos=u'IN'),
+                Term(word=u'ancient', pos=u'JJ'),
+                Term(word=u'air', pos=u'NN')]
+            where `Term` is a `namedtuple('Term', ['word', 'pos'])`
+        """
+        sentence = []
+        for _ in self.__iter__():
+            sentence.append(self.listOfTerms(content_words, ctw, normalize, lower))
+        return sentence
