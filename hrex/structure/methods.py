@@ -106,7 +106,7 @@ class AbstractMethod(object):
             self.identifyRelations()
         intersect = set(self.gsrels).intersection(set(self.rels))
         if len(self.rels) != 0:
-            self.prec = float(intersect)/len(self.rels)
+            self.prec = float(len(intersect))/len(self.rels)
         else:
             self.prec = 0.0
         return self.prec
@@ -132,9 +132,10 @@ class AbstractMethod(object):
             self.identifyRelations()
         intersect = set(self.gsrels).intersection(set(self.rels))
         if len(self.gsrels) != 0:
-            self.rec = float(intersect)/len(self.gsrels)
+            self.rec = float(len(intersect))/len(self.gsrels)
         else:
             self.rec = 0.0
+        print self.gsrels
         return self.rec
 
 

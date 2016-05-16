@@ -400,7 +400,7 @@ class DictWords(AbstractDictionary):
         return self.dict_t.has_key(id)
 
 
-    def setid(self, key, newid):
+    def setId(self, key, newid):
         """
         Change the key in the dictionary from id to the new id.
 
@@ -418,7 +418,7 @@ class DictWords(AbstractDictionary):
             logger.error('there is no such key in the dictionary: %s' % key)
 
 
-    def setfreq(self, key, newf):
+    def setFreq(self, key, newf):
         """
         Change the value of the `freq` for a certain key. 
         This is used to update the dictionary, changing the 
@@ -438,7 +438,7 @@ class DictWords(AbstractDictionary):
             logger.error('there is no such key in the dictionary: %s' % key)
 
 
-    def getfreq(self, key, transposed=False):
+    def getFreq(self, key, transposed=False):
         """
         Return the frequency of a certain key. `key` has the
         value of `word` in case of `transposed=False` and the
@@ -582,7 +582,7 @@ class DictRels(AbstractDictionary):
         return tuples
 
 
-    def setfreq(self, key, newf):
+    def setFreq(self, key, newf):
         """
         Change the value of the `freq` for a certain key. 
 
@@ -599,10 +599,32 @@ class DictRels(AbstractDictionary):
             logger.error('there is no such key in the dictionary: %r' % key)
 
 
-    def getfreq(self, key):
+    def getFreq(self, key):
         """
         Return the frequency of a certain key.
         """
         return self.__getitem__(key)
+
+
+    def getContexts(self, key):
+        """
+        Return a list of contexts to a certain `key`.
+        
+        Parameters:
+        -----------
+        key : int
+            The id of the word to get the contexts.
+
+        Returns:
+        --------
+        contexts : list
+            A list containing all contexts of `key`
+        """
+        contexts = []
+        for k in dict.iterkeys(self):
+            idw, idc = k
+            if idw == key:
+                contexts.append(idc)
+        return contexts
 
 #End of class DictWords

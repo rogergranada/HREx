@@ -99,16 +99,19 @@ class INRIASAC(AbstractMethod):
         In this method, the dictionary `dwords` contains the document frequency
         `df` instead of the term frequency `tf` associated to the term.
         The relations found by the method are saved into self.rels
-        """ 
-        for w1 in self.dwords:
+        """
+        keys = self.dwords.keys()
+        for i in xrange(len(keys)):
+            w1 = keys[i]
             id1, df1 = self.dwords[w1]
             ctx1 = self.drels.getContexts(id1)
-            for w2 in self.dwords:
+            for j in xrange(i+1, len(keys)):
+                w2 = keys[j]
                 id2, df2 = self.dwords[w2]
                 ctx2 = self.drels.getContexts(id2)
-            if  set(ctx1).intersection(set(ctx2)):
-                if df1 > df2:
-                    self.rels.append((w1, w2))
-                elif df2 > df1:
-                    self.rels.append((w2, w1))
+                if w1 != w2 and set(ctx1).intersection(set(ctx2)):
+                    if df1 > df2:
+                        self.rels.append((w1, w2))
+                    elif df2 > df1:
+                        self.rels.append((w2, w1))
 #End of class INRIASAC
