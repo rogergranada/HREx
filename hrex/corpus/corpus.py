@@ -192,20 +192,33 @@ class Corpus(object):
         """
         Extract terms from the corpus using the whole document as window of cooccurrences.
 
+        Notes:
+        ------
+        In this function the `tf` value is changed by the `df` value in self.dwords. Thus, the 
+        dictionary of words is composed by the word: (id, df), where `df` means the document 
+        frequency.
         """
         idsent = 0
         for filename in self.docs:
             parser = self.Parser(join(self.dirin, filename), extract='WordsAndTags')
+            docwords = []
+            newwords = []
             for _ in parser:
                 content = parser.listOfTerms(content_words=cwords, ctw=ctw, normalize=normalize, lower=lower)
                 for term, pos in content:
-                    self.dwords[term] = 1
+                    if not self.dwords.has_key(term):
+                        self.dwords[term] = 1
+                        newwords.append(term)
+                    docwords.append(term)
                     self.dctxs[idsent] = 1
                     idt, _ = self.dwords[term]
                     idc, _ = self.dctxs[idsent]
                     self.drels[(idt, idc)] = 1
                 idsent += 1
-
+            t_indoc = set(docwords) - set(newwords)
+            for word in t_indoc:
+                self.dwords[word] = 1
+        print self.dwords
 
     def save(self, fout, mode='db', new=True):
         """

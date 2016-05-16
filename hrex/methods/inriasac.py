@@ -47,14 +47,68 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 from codecs import getwriter, open
 sys.stdout = getwriter('UTF-8')(sys.stdout)
 
-from structure.methods import MethodInterface
+from structure.methods import AbstractMethod
  
-class INRIASAC(MethodInterface):
+class INRIASAC(AbstractMethod):
     """
     Identify hierarchical relations using the SLQS algorithm.
     """
-    def __init__(self):
-        MethodInterface.__init__(self)
+    def __init__(self, dwords, drels):
+        """
+        Initiates the class INRIASAC
+
+        Parameters:
+        -----------
+        dwords : DicWords
+            Dictionary of words in the form:
+                word: (id, df)
+        drels : DictRels
+            Dictionary containing the relations between words 
+            and contexts. This dictionary has the form:
+                (idw, idc): freq
+
+        Notes:
+        ------
+        MethodInterface sets default values and contains the precision, recall and f-measure
+
+        self.rels : list
+            A list containing the Hypernym-hyponym relations found by the method. 
+            The list has the form:
+                [(idH_1, idh_1), (idH_2, idh_2), ...]
+
+        self.gsrels : list
+            A list containing the relations found in a gold standard.
+        """
+        default = {'lex_mode':'lemma', 'cwords':True, 'ctw':'n', 'normalize':True, 'lower':True}
+        AbstractMethod.__init__(self, default=default)
+        self.dwords = dwords
+        self.drels = drels
+
+        self.rels = []
+        self.gsrels = []
 
 
+    def identifyRelations(self):
+        """
+        Identify relations between terms based on the model. This function 
+        uses self.dwords, self.dctxs and/or self.drels in order to find the
+        most hierarchical related terms.
 
+        Notes:
+        ------
+        In this method, the dictionary `dwords` contains the document frequency
+        `df` instead of the term frequency `tf` associated to the term.
+        The relations found by the method are saved into self.rels
+        """ 
+        for w1 in self.dwords:
+            id1, df1 = self.dwords[w1]
+            ctx1 = self.drels.getContexts(id1)
+            for w2 in self.dwords:
+                id2, df2 = self.dwords[w2]
+                ctx2 = self.drels.getContexts(id2)
+            if  set(ctx1).intersection(set(ctx2)):
+                if df1 > df2:
+                    self.rels.append((w1, w2))
+                elif df2 > df1:
+                    self.rels.append((w2, w1))
+#End of class INRIASAC
