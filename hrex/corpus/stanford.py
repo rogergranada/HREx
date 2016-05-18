@@ -77,7 +77,6 @@ class Stanford(ParserInterface):
         parsed = False #semaphore : parsed tree
         dep = False    #semaphore : dependencies of the phrase
 
-        logger.info('Reading lines from corpus')
         #pb = ProgressBar(self.__len__())
         for n, line in enumerate(self.fin):
             #print line

@@ -135,7 +135,6 @@ class AbstractMethod(object):
             self.rec = float(len(intersect))/len(self.gsrels)
         else:
             self.rec = 0.0
-        print self.gsrels
         return self.rec
 
 

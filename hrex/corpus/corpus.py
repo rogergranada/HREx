@@ -66,6 +66,7 @@ class Corpus(object):
                 for filename in sorted(parsedfiles):
                     name, ext = splitext(filename)
                     if ext.endswith(filetype):
+                        logger.info('parsing file: %s' % filename)
                         self.docs.append(filename)
 
         self.dwords = dictionaries.DictWords()
@@ -185,7 +186,6 @@ class Corpus(object):
                 idt, _ = self.dwords[term]
                 idc, _ = self.dctxs[iddoc]
                 self.drels[(idt, idc)] = 1
-        print self.drels
 
 
     def extractSentences(self, lex_mode='word', cwords=True, ctw='n', normalize=True, lower=False):
@@ -218,7 +218,6 @@ class Corpus(object):
             t_indoc = set(docwords) - set(newwords)
             for word in t_indoc:
                 self.dwords[word] = 1
-        print self.dwords
 
     def save(self, fout, mode='db', new=True):
         """
@@ -256,5 +255,4 @@ class Corpus(object):
         self.dwords.load(fin, dname='dwords', mode=mode)
         self.dctxs.load(fin, dname='dctxs', mode=mode)
         self.drels.load(fin, dname='drels', mode=mode)
-        print self.dwords
 #End of class Corpus

@@ -2,35 +2,9 @@
 #-*- coding: utf-8 -*-
 
 """
-**INRIASAC**: The model based on the frequency of a term in a document when occurring with
-other terms in the same sentence \cite{Grefenstette2015}, and is meant to capture the 
-intuition that general terms are more widely distributed than more specific terms (e.g., 
-dog appears in more Wikipedia articles than poodle).
-
-The original version of this algorithm uses a Porter stemmed version of the terms while here
-we can use raw or lemmas to process the method. Thus, let $D(term)$ be the document frequency 
-of a term in the corpus. Let $SentCooc(term_i, term_j)$ be the number of times that the $term_i$ 
-and $term_j$ appear in the same sentence in the corpus. Given two terms, $term_i$ and $term_j$,
-if $term_i$ appears in more documents than $term_j$, then $term_i$ is a candidate hypernym for 
-$term_j$. 
-
-```
-CandHypenym(term_i) = { term_j :
-    SentCooc(term_i, term_j ) > 0 &&
-    D(term_j) > D(term_i)
-```
-
-Next the best hyperym candidate is defined for $term_i$ as being the $term_k$ that appears 
-in the most documents:
-
-```
-BestHypernym(term_i) = term_k such that
-    \forall term_j \in CandHypernym(term_i) :
-        D(term_k) > D(term_j)
-```
-
-Removing this term $term_k$ from CandHypernym($term_i$) and repeating the heuristic allows to 
-extract the most hypernyms candidates to the $term_i$.
+**DF**: The model based on the document frequency takes into account the number of documents
+in which a word appears as an evidence of taxonomic relation. Thus, a word that occurs in more
+documents tends to be more general than a word that appears in few documents.
 
 @author: granada
 """ 
@@ -40,28 +14,24 @@ import sys
 sys.path.insert(0, '..') # This line is inserted to find the package utils.arguments
 
 import logging
-logger = logging.getLogger('methods.inriasac')
+logger = logging.getLogger('methods.df')
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 from structure.methods import AbstractMethod
  
-class INRIASAC(AbstractMethod):
+class DF(AbstractMethod):
     """
-    Identify hierarchical relations using the INRIASAC algorithm.
+    Identify hierarchical relations using the DF algorithm.
     """
-    def __init__(self, dwords=None, drels=None):
+    def __init__(self, dwords=None):
         """
-        Initiates the class INRIASAC
+        Initiates the class DF
 
         Parameters:
         -----------
         dwords : DicWords
             Dictionary of words in the form:
                 word: (id, df)
-        drels : DictRels
-            Dictionary containing the relations between words 
-            and contexts. This dictionary has the form:
-                (idw, idc): freq
 
         Notes:
         ------
@@ -78,7 +48,6 @@ class INRIASAC(AbstractMethod):
         default = {'lex_mode':'lemma', 'cwords':True, 'ctw':'n', 'normalize':True, 'lower':True}
         AbstractMethod.__init__(self, default=default)
         self.dwords = dwords
-        self.drels = drels
 
         self.rels = []
         self.gsrels = []
@@ -100,14 +69,12 @@ class INRIASAC(AbstractMethod):
         for i in xrange(len(keys)):
             w1 = keys[i]
             id1, df1 = self.dwords[w1]
-            ctx1 = self.drels.getContexts(id1)
             for j in xrange(i+1, len(keys)):
                 w2 = keys[j]
                 id2, df2 = self.dwords[w2]
-                ctx2 = self.drels.getContexts(id2)
-                if w1 != w2 and set(ctx1).intersection(set(ctx2)):
+                if w1 != w2:
                     if df1 > df2:
                         self.rels.append((w1, w2))
                     elif df2 > df1:
                         self.rels.append((w2, w1))
-#End of class INRIASAC
+#End of class DF
