@@ -69,7 +69,7 @@ class DSim(AbstractMethod):
 
         Notes:
         ------
-        MethodInterface sets default values and contains the precision, 
+        AbstractMethod sets default values and contains the precision, 
         recall and f-measure
 
         self.rels : list
@@ -191,7 +191,7 @@ class Weeds(DSim):
     """
     def __init__(self, dwords=None, drels=None):
         """
-        Initiates the class DF
+        Initiates the class Weeds
 
         Parameters:
         -----------
@@ -200,11 +200,12 @@ class Weeds(DSim):
                 word: (id, df)
         drels : DicRels
             Dictionary of relations in the form:
-                (idw, idc): tf
+                (idw, idc): ppmi
+            where ppmi is the Positive Pointwise Mutual Information
 
         Notes:
         ------
-        MethodInterface sets default values and contains the precision, recall and f-measure
+        DSim sets default values and contains the precision, recall and f-measure
 
         self.rels : list
             A list containing the Hypernym-hyponym relations found by the method. 
@@ -225,14 +226,15 @@ class Weeds(DSim):
     def identifyRelations(self):
         """
         Identify relations between terms based on the model. This function 
-        uses self.dwords, self.dctxs and/or self.drels in order to find the
-        most hierarchical related terms.
+        uses self.dwords and self.drels in order to find the most hierarchical 
+        related terms.
 
         Notes:
         ------
-        In this method, the dictionary `dwords` contains the document frequency
-        `df` instead of the term frequency `tf` associated to the term.
-        The relations found by the method are saved into self.rels
+        In this method, the dictionary `drels` contains the positive pointwise 
+        mutual information `ppmi` instead of the term frequency `tf` associated 
+        to the term and context. The relations found by the method are saved 
+        into self.rels
         """
         drels = self.drels.dic2List()
         keys = self.dwords.keys()
@@ -252,7 +254,101 @@ class Weeds(DSim):
                 weedsrec = both_v2.sum() / v2.sum()
 
                 if weedsprec > weedsrec:
-                    self.rels.append((w1, w2))
-                elif weedsrec > weedsprec:
                     self.rels.append((w2, w1))
+                elif weedsrec > weedsprec:
+                    self.rels.append((w1, w2))
 #End of class Weeds
+
+
+class ClarkDE(DSim):
+    """
+    Clarke [4] formalised the idea of distributional generality and computes the
+    entailment between two words using a variation of Weeds et al. [2,3] measures.
+    The measure differs from the one proposed by Weeds et al. because it reduces
+    the weight of included features if they have lower weight within the vector of 
+    the broader term. Precision (ClarkeDEPrec) and recall (ClarkeDERec) are defined as:
+
+
+    ClarkeDEPrec(u, v) = \frac{\sum_{f \in F_u \cap F_v}min(I(u,f), I(v,f))}
+                              {\sum_{f \in F_u}I(u, f)}
+    ClarkeDERec(u, v)  = \frac{\sum_{f \in F_u \cap F_v}min(I(u,f), I(v,f))}
+                              {\sum_{f \in F_v}I(v, f)}
+
+    [4] Daoud Clarke. Context-theoretic semantics for natural language: An overview. 
+        In Proceedings of the Workshop on Geometrical Models of Natural Language Semantics, 
+        GEMS ’09, pages 112–119. Association for Computational Linguistics, 2009.
+    """
+    def __init__(self, dwords=None, drels=None):
+        """
+        Initiates the class ClarkeDE
+
+        Parameters:
+        -----------
+        dwords : DicWords
+            Dictionary of words in the form:
+                word: (id, df)
+        drels : DicRels
+            Dictionary of relations in the form:
+                (idw, idc): ppmi
+            where ppmi is the Positive Pointwise Mutual Information
+
+        Notes:
+        ------
+        DSim sets default values and contains the precision, recall and f-measure
+
+        self.rels : list
+            A list containing the Hypernym-hyponym relations found by the method. 
+            The list has the form:
+                [(idH_1, idh_1), (idH_2, idh_2), ...]
+
+        self.gsrels : list
+            A list containing the relations found in a gold standard.
+        """
+        default = {'window': 5, 'lex_mode':'lemma', 'cwords':True, 'ctw':'n', 'normalize':True, 'lower':True}
+        AbstractMethod.__init__(self, default=default)
+        self.dwords = dwords
+        self.drels = drels
+        self.rels = []
+        self.gsrels = []
+        
+
+    def identifyRelations(self):
+        """
+        Identify relations between terms based on the model. This function 
+        uses self.dwords and self.drels in order to find the most hierarchical 
+        related terms.
+
+        Notes:
+        ------
+        In this method, the dictionary `drels` contains the positive pointwise 
+        mutual information `ppmi` instead of the term frequency `tf` associated 
+        to the term and context. The relations found by the method are saved 
+        into self.rels
+        """
+        drels = self.drels.dic2List()
+        keys = self.dwords.keys()
+        for i in xrange(len(keys)):
+            w1 = keys[i]
+            id1, df1 = self.dwords[w1]
+            ctx1 = drels[id1]
+            for j in xrange(i+1, len(keys)):
+                w2 = keys[j]
+                id2, df2 = self.dwords[w2]
+                ctx2 = drels[id2]
+
+                v1, v2, vboth = self._buildVectors(ctx1, ctx2)
+                both_v1, both_v2 =self._intersectedFeatures(v1, v2)
+
+                numerator = 0
+                for i in range(len(both_v1)):
+                    value = min(both_v1[i], both_v2[i])
+                    numerator += value
+                clarkeprec = numerator / v1.sum()
+                clarkerec = numerator / v2.sum()
+
+                if clarkeprec > clarkerec:
+                    self.rels.append((w2, w1))
+                elif clarkerec > clarkeprec:
+                    self.rels.append((w1, w2))
+#End of class ClarkDE
+

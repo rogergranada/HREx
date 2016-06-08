@@ -219,6 +219,77 @@ class Corpus(object):
             for word in t_indoc:
                 self.dwords[word] = 1
 
+
+    def _calculateFrequencies(self):
+        """
+        Calculate number of words, contexts, relations and the sum of relations 
+        into the `self.drels` dictionary.
+
+        Returns:
+        -------
+        nb_words : int
+            Number of words
+        nb_ctxs : int
+            Number of contexts
+        nb_rels : int
+            Number of relations
+        sum_rels : int
+            Sum of the number of relations
+        """
+        dw = {}
+        dc = {}
+        nb_rels = 0
+        sum_rels = 0
+        for idw, idc in self.drels:
+            tf = self.drels[(idw, idc)]
+            dw[idw] = ''
+            dc[idc] = ''
+            sum_rels += tf
+        nb_words = len(dw.keys())
+        nb_ctxs = len(dc.keys())
+        nb_rels = len(self.drels.keys())
+        return nb_words, nb_ctxs, nb_rels, sum_rels
+
+
+    def weightTerms(self, measure='ppmi', replace=False):
+        """
+        Calculate the weight for terms.
+
+        Parameters:
+        -----------
+        measure : string {pmi, ppmi, lmi}
+            pmi : Pontwise Mutual Information
+            ppmi : Positive Pontwise Mutual Information
+            lmi : Local Mutual Information
+        replace : boolean {True, False}
+            replace self.drels with the weighted values
+        """
+        from utils import mathutils
+           
+        if measure not in ['pmi', 'ppmi', 'lmi']:
+             logger.error('cannot build dictionary: %s' % measure)
+             sys.exit(1)
+        self.dwords_t = self.dwords.id2key()
+        self.dctxs_t = self.dctxs.id2key()
+        dweights = dictionaries.DictRels()
+        _, _, _, sum_rels = self._calculateFrequencies()
+
+        for idw, idc in self.drels:
+            _, tfw = self.dwords_t[idw]
+            _, tfc = self.dctxs_t[idc]
+            tfboth = self.drels[(idw, idc)]
+            if measure == 'pmi':
+                weight = mathutils.pmi(tfboth, tfw, tfc, sum_rels)
+            elif measure == 'ppmi':
+                weight = mathutils.ppmi(tfboth, tfw, tfc, sum_rels)
+            elif measure == 'lmi':
+                weight = mathutils.lmi(tfboth, tfw, tfc, sum_rels)
+            dweights[(idw, idc)] = weight
+        if replace:
+            self.drels = dweights
+        return dweights
+
+
     def save(self, fout, mode='db', new=True):
         """
         Save the dictionaries of words, contexts and relations between
@@ -234,9 +305,9 @@ class Corpus(object):
         new : Boolean {True, False}, optional
             Save the dictionary into an empty file
         """
-        self.dwords.save(fout, dname='dwords', mode=mode, new=new)
-        self.dctxs.save(fout, dname='dctxs', mode=mode)
-        self.drels.save(fout, dname='drels', mode=mode)
+        self.dwords.save(fout, dtype='dwords', mode=mode, new=new)
+        self.dctxs.save(fout, dtype='dctxs', mode=mode)
+        self.drels.save(fout, dtype='drels', mode=mode)
 
 
     def load(self, fin, mode='db'):
