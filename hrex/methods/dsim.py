@@ -28,8 +28,8 @@ ClarkeDERec(u, v) = \frac{\sum_{f \in F_u \cap F_v}min(I(u,f), I(v,f))}{\sum_{f 
 $$
 
 These measures can identify taxonomic relations between terms using the notion of precision and recall 
-of a term. The code implementing these measures are freely available by [Weeds](https://github.com/SussexCompSem/learninghypernyms)
-:cite:`WeedsEtAl2014`.
+of a term. The code implementing these measures are freely available by 
+[Weeds](https://github.com/SussexCompSem/learninghypernyms) :cite:`WeedsEtAl2014`.
 
 @author: granada
 """ 
@@ -42,13 +42,154 @@ import logging
 logger = logging.getLogger('methods.dsim')
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
+import numpy as np
+
 from structure.methods import AbstractMethod
- 
+from utils import mathutils
+
+
 class DSim(AbstractMethod):
     """
-    Identify hierarchical relations using the DF algorithm.
+    Identify hierarchical relations using the DSim algorithm.
+    This is an abstract class to be inherited by methods that 
+    implement DSim.
     """
-    def __init__(self, dwords=None):
+    def __init__(self, dwords=None, drels=None):
+        """
+        Initiates the class DSim
+
+        Parameters:
+        -----------
+        dwords : DicWords
+            Dictionary of words in the form:
+                word: (id, df)
+        drels : DicRels
+            Dictionary of relations in the form:
+                (idw, idc): tf
+
+        Notes:
+        ------
+        MethodInterface sets default values and contains the precision, 
+        recall and f-measure
+
+        self.rels : list
+            A list containing the Hypernym-hyponym relations found by the method. 
+            The list has the form:
+                [(idH_1, idh_1), (idH_2, idh_2), ...]
+
+        self.gsrels : list
+            A list containing the relations found in a gold standard.
+        """
+        
+        self.dwords = dwords
+        self.drels = drels
+
+
+    def _buildVectors(self, l1, l2):
+        """
+        Transform lists into an intersection like lists.
+
+        Parameters:
+        -----------
+        l1 : array_like
+            list containing contexts and frequencies
+        l2 : array_like
+            list containing contexts and frequencies
+
+        Returns:
+        --------
+        v1 : array_like
+            list containing the intersection-like of elements
+        v1 : array_like
+            list containing the intersection-like of elements
+        both : array_like
+            list of elements in both lists
+
+        Examples:
+        ---------
+        >>> u = [(1, 1), (2, 2), (3, 3)]
+        >>> v = [(2, 20), (3, 30), (4, 40)]
+        >>> v1, v2, both = DSim()._buildVectors(u, v)
+        >>> v1
+            [2, 3]
+        >>> v2
+            [20, 30]
+        >>> both
+            [2, 3]
+        """
+        d1 = dict(l1)
+        d2 = dict(l2)
+        bothkeys = set(d1.keys()).union(d2.keys())
+
+        v1 = np.array([], dtype=np.float64)
+        v2 = np.array([], dtype=np.float64)
+        for id in bothkeys:
+            if d1.has_key(id):
+                v1 = np.append(v1, d1[id])
+            else:
+                v1 = np.append(v1, 0)
+            if d2.has_key(id):
+                v2 = np.append(v2, d2[id])
+            else:
+                v2 = np.append(v2, 0)
+        return v1, v2, list(bothkeys)
+
+
+    def _intersectedFeatures(self, l1, l2):
+        """
+        Get the values of the intersection of two vectors. 
+
+        Parameters:
+        -----------
+        l1 : array_like
+            list containing frequencies of contexts
+        l2 : array_like
+            list containing frequencies of contexts
+
+        Returns:
+        --------
+        both_u : array_like
+            List containing elements of l1 that appear in both lists
+        both_v : array_like
+            List containing elements of l2 that appear in both lists
+
+        Examples:
+        ------
+        >>> u = [10, 0, 5]
+        >>> v = [20, 30, 2]
+        >>> v1, v2 = DSim()._intersectedFeatures(u, v)
+        >>> v1
+            [10, 5]
+        >>> v2
+            [20, 2]
+        """
+        both = (l1 != 0) & (l2 != 0)
+        return l1[both], l2[both]
+ 
+
+class Weeds(DSim):
+    """
+    Identify hierarchical relations using the Weeds et al. (2004) algorithm.
+    H1: If $w_1$ entails $w_2$ then the characteristics of $w_1$ also appear in $w_2$;
+    H2: If all the features of $w_1$ appear in $w_2$, then $w_1$ entails $w_2$ [2,3].
+    WeedsPrec is defined as:
+        WeedsPrec(u,v) = \frac{\sum_{f \in (F_u \cap F_v)}w_u(f)}
+                              {\sum_{f \in (F_u)}w_u(f)}
+        WeedsRec(u,v) = \frac{\sum_{f \in (F_u \cap F_v)}w_v(f)}
+                              {\sum_{f \in (F_u)}w_v(f)}
+    where $F_x$ is the set of features of a term $x$, and $w_x(f)$ is the weight of
+    the feature $f$
+    [2] Weeds, J., Weir, D.: A general framework for distributional similarity. 
+        In: Proceedings of the 2003 conference on Empirical methods in natural 
+        language processing (EMNLP '03). Association for Computational Linguistics, 
+        Stroudsburg, PA, USA, 81-88, 2003. http://dx.doi.org/10.3115/1119355.1119366.
+    [3] Weeds, j., Weir, D., McCarthy, D.: Characterising measures of lexical 
+        distributional similarity. In: Proceedings of the 20th international 
+        conference on Computational Linguistics (COLING '04). Association for 
+        Computational Linguistics, Stroudsburg, PA, USA, 2004,
+        http://dx.doi.org/10.3115/1220355.1220501
+    """
+    def __init__(self, dwords=None, drels=None):
         """
         Initiates the class DF
 
@@ -57,6 +198,9 @@ class DSim(AbstractMethod):
         dwords : DicWords
             Dictionary of words in the form:
                 word: (id, df)
+        drels : DicRels
+            Dictionary of relations in the form:
+                (idw, idc): tf
 
         Notes:
         ------
@@ -70,13 +214,13 @@ class DSim(AbstractMethod):
         self.gsrels : list
             A list containing the relations found in a gold standard.
         """
-        default = {'lex_mode':'lemma', 'cwords':True, 'ctw':'n', 'normalize':True, 'lower':True}
+        default = {'window': 5, 'lex_mode':'lemma', 'cwords':True, 'ctw':'n', 'normalize':True, 'lower':True}
         AbstractMethod.__init__(self, default=default)
         self.dwords = dwords
-
+        self.drels = drels
         self.rels = []
         self.gsrels = []
-
+        
 
     def identifyRelations(self):
         """
@@ -90,16 +234,25 @@ class DSim(AbstractMethod):
         `df` instead of the term frequency `tf` associated to the term.
         The relations found by the method are saved into self.rels
         """
+        drels = self.drels.dic2List()
         keys = self.dwords.keys()
         for i in xrange(len(keys)):
             w1 = keys[i]
             id1, df1 = self.dwords[w1]
+            ctx1 = drels[id1]
             for j in xrange(i+1, len(keys)):
                 w2 = keys[j]
                 id2, df2 = self.dwords[w2]
-                if w1 != w2:
-                    if df1 > df2:
-                        self.rels.append((w1, w2))
-                    elif df2 > df1:
-                        self.rels.append((w2, w1))
-#End of class DF
+                ctx2 = drels[id2]
+
+                v1, v2, vboth = self._buildVectors(ctx1, ctx2)
+                #prec, rec = mathutils.WeedsPrecRec(v1, v2)
+                both_v1, both_v2 =self._intersectedFeatures(v1, v2)
+                weedsprec = both_v1.sum() / v1.sum()
+                weedsrec = both_v2.sum() / v2.sum()
+
+                if weedsprec > weedsrec:
+                    self.rels.append((w1, w2))
+                elif weedsrec > weedsprec:
+                    self.rels.append((w2, w1))
+#End of class Weeds
