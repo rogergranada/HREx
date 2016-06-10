@@ -43,13 +43,103 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 from codecs import getwriter, open
 sys.stdout = getwriter('UTF-8')(sys.stdout)
 
+import numpy as np
+
 from structure.methods import AbstractMethod
  
 class SLQS(AbstractMethod):
     """
     Identify hierarchical relations using the SLQS algorithm.
     """
-    def __init__(self):
-        pass
+    def __init__(self, dwords=None, dctxs=None, drels=None):
+        """
+        Initiates the class SLQS
+
+        Parameters:
+        -----------
+        dwords : DicWords
+            Dictionary of words in the form:
+                word: (id, df)
+        dctxs : DicWords
+            Dictionary of contexts in the form:
+                ctx: (id, df)
+        drels : DicRels
+            Dictionary of relations in the form:
+                (idw, idc): weight
+            where `weight` is a LMI - MinMax scored
+
+        Notes:
+        ------
+        AbstractMethod sets default values and contains the precision, 
+        recall and f-measure
+
+        self.rels : list
+            A list containing the Hypernym-hyponym relations found by the method. 
+            The list has the form:
+                [(idH_1, idh_1), (idH_2, idh_2), ...]
+
+        self.gsrels : list
+            A list containing the relations found in a gold standard.
+        """
+        default = {'window': 5, 'lex_mode':'lemma', 'cwords':True, 'ctw':'n', 'normalize':True, 'lower':True}
+        AbstractMethod.__init__(self, default=default)
+        self.dwords = dwords
+        self.dctxs = dctxs
+        self.drels = drels
+        self.rels = []
+        self.gsrels = []
 
 
+    def _buildMeanEntropy(self):
+        """
+        Calculate the mean entropy from `self.dctxs` to `self.dwords`,
+        associating each word with the mean of the entropy of its contexts.
+        """
+        # use ids as keys to self.dctx
+        dctx_t = self.dctxs.id2key()
+        for w in self.dwords:
+            idw, _ = self.dwords[w]
+            
+            lctx = self.drels.getContexts(idw)
+            ent = []
+            for idc in lctx:
+                _, e = dctx_t[idc]
+                ent.append(e)
+            ent = np.asarray(ent)
+            self.dwords.setFreq(w, np.mean(ent))
+        del self.dctxs
+        del self.drels
+
+
+    def identifyRelations(self):
+        """
+        Identify relations between terms based on the model. This function 
+        uses self.dwords and self.drels in order to find the most hierarchical 
+        related terms.
+
+        Notes:
+        ------
+        In this method, the dictionary `drels` contains the positive pointwise 
+        mutual information `ppmi` instead of the term frequency `tf` associated 
+        to the term and context. The relations found by the method are saved 
+        into self.rels
+        """
+        # calculate the mean entropy for words
+        self._buildMeanEntropy()
+        
+        keys = self.dwords.keys()
+        for i in xrange(len(keys)):
+            w1 = keys[i]
+            idw1, e1 = self.dwords[w1]
+            for j in xrange(i+1, len(keys)):
+                w2 = keys[j]
+                idw2, e2 = self.dwords[w2]
+
+                if e1 and e2:
+                    slqs = 1 - (float(e1)/e2)
+
+                    if slqs > 0:
+                        self.rels.append((w2, w1))
+                    elif slqs < 0:
+                        self.rels.append((w1, w2))
+#End of class SLQS

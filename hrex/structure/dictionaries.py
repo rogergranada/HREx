@@ -194,7 +194,7 @@ class AbstractDictionary(dict):
             return dict(self.copy())
 
 
-    def save(self, fout, dname=None, mode='db', new=False):
+    def save(self, fout, dtype=None, mode='db', new=False, name=None):
         """
         Save the dictionary into `fout`.
 
@@ -202,9 +202,12 @@ class AbstractDictionary(dict):
         -----------
         fout : string
             The path to the output file
-        dname : string {'dwords','dctxs', 'drels'}
-            The name of the dictionary
+        dtype : string {'dwords','dctxs', 'drels'}
+            The type of the dictionary
         mode : string {'text', 'db', 'shelve'}
+            The type of storage
+        name: string
+            Name of a table or dictionary in case different of dtype
         """
         if mode == 'db':
             dbm = SQLite(fout)
@@ -220,7 +223,7 @@ class AbstractDictionary(dict):
         else:
             logger.error('Cannot save dictionary - `mode=%s` no specified' % mode)
             return False
-        dbm.save(self, dtype=dname)
+        dbm.save(self, dtype=dtype, name=name)
         dbm.close()
         return True
 
@@ -465,6 +468,22 @@ class DictWords(AbstractDictionary):
             else:
                 f = None
         return f
+
+
+    def allFrequencies(self):
+        """
+        Return a list containing all frequencies of the elements.
+
+        Returns:
+        --------
+        lfreqs = array_like
+            list containing the frequencies
+        """
+        lfreqs = []
+        for w in dict.iterkeys(self):
+            t, f = dict.__getitem__(self, w)
+            lfreqs.append(f)
+        return lfreqs
 #End of class DictWords
 
 
@@ -483,7 +502,14 @@ class DictRels(AbstractDictionary):
         -----------
         input : string, optional
             A dictionary that is transformed into DictWords
+        mode : string {tuple, list}
+            Describe the mode of the input. Acceptable modes are:
+            - tuple (default): dictionary has the form (idw, idc): freq
+            - list: dictionary has the form idw: [(idc1, freq), (idc2, freq), ...]
         """
+        if input:
+            if isinstance(input.keys()[0], int):
+                input = self.list2Dic(input)
         AbstractDictionary.__init__(self, input=input)
 
 
@@ -494,10 +520,12 @@ class DictRels(AbstractDictionary):
 
         Parameters:
         -----------
-        key : tuple
-            A pair of ids (idw, idc)
-        value: int
-            The frequency of the pair key
+        key : {tuple, int}
+            - tuple: A pair of ids (idw, idc)
+            - int: idw
+        value: {int, list}
+            - int: The frequency of the pair key
+            - list: Tuples containing (idc, tf)
 
         Examples:
         ---------
@@ -507,11 +535,22 @@ class DictRels(AbstractDictionary):
         >>> d[(1, 2)] = 4
             {(1, 2): 5}
         """
-        if dict.has_key(self, key):
-            f = dict.__getitem__(self, key)
-            dict.__setitem__(self, key, f+value)
+        if isinstance(key, int) and isinstance(value, list):
+            # in case of input `idw: [(idc, t), (idc, t), ...]`
+            for idc, tf in value:
+                tkey = (key, idc)
+                if dict.has_key(self, tkey):
+                    f = dict.__getitem__(self, tkey)
+                    dict.__setitem__(self, tkey, f+tf)
+                else:
+                    dict.__setitem__(self, tkey, tf)
         else:
-            dict.__setitem__(self, key, value)
+            # in case of input `(idw, idc): t`
+            if dict.has_key(self, key):
+                f = dict.__getitem__(self, key)
+                dict.__setitem__(self, key, f+value)
+            else:
+                dict.__setitem__(self, key, value)
 
 
     def id2key(self, simplify=False):
@@ -532,7 +571,7 @@ class DictRels(AbstractDictionary):
             as value.
         """
         if not self.dict_t:
-            self.dict_t = DicRels()
+            self.dict_t = DictRels()
             for key in dict.iterkeys(self):
                 idw, idc = key
                 f = dict.__getitem__(self, key)
@@ -572,14 +611,89 @@ class DictRels(AbstractDictionary):
             [(2, 1, 1),(3, 1, 2),(3, 2, 3)]
         """
         tuples = []
-        for key in dict.iterkeys(self):
-            idw, idc = key
-            f = dict.__getitem__(self, key)
-            if transposed or id == 'idc':
+        for kval in dict.iterkeys(self):
+            idw, idc = kval
+            f = dict.__getitem__(self, kval)
+            if transposed or key == 'idc':
                 tuples.append((idc, idw, f))
             else:
                 tuples.append((idw, idc, f))
         return tuples
+
+
+    def dic2List(self, key='idw', transposed=False):
+        """
+        Return the dictionary in form of list of contexts or words.
+
+        Parameters:
+        -----------
+        key : string {'idw', 'idc'}
+            Choose the element to be the key of the dictionary
+        transposed : boolean {True, False}, optional
+            Transform keys into ids and ids into keys
+
+        Returns:
+        --------
+        ld = dict
+            A dictionary containing a list of contexts
+
+        Notes:
+        ------
+        Using `key='idc'` is equal to use transposed=True
+
+        Examples:
+        ---------
+        >>> d = DictRels({(1,2): 1, (1,3): 2, (2,3): 3})
+        >>> d.dic2List(transposed=False)
+            {1: [(2, 1),(3, 2)], 2: [(3, 3)]}
+        >>> d.dic2List(transposed=True)
+            [2: [(1, 1)], 3:[(1, 2), (2, 3)]}
+        """
+        dic = DictList()
+        for kval in dict.iterkeys(self):
+            idw, idc = kval
+            f = dict.__getitem__(self, kval)
+            if transposed or key == 'idc':
+                dic[idc] = (idw, f)
+            else:
+                dic[idw] = (idc, f)
+        return dic
+
+
+    def list2Dic(self, dlist, transposed=False):
+        """
+        Return the dictionary with the key in form of tuple.
+
+        Parameters:
+        -----------
+        dlist : dict
+            Dictionary in the form `idw: [(idc1, tf), (idc2, tf), ...]
+        transposed : boolean {True, False}, optional
+            Transform keys into ids and ids into keys
+
+        Returns:
+        --------
+        dic = dict
+            A dictionary containing tuples as keys and freq as value
+
+        Examples:
+        ---------
+        >>> dic = {1: [(2, 1),(3, 2)], 2: [(3, 3)]}
+        >>> d = DictRels().list2Dic(dic, transposed=False)
+            {(1,2): 1, (1,3): 2, (2,3): 3})
+        >>> d = DictRels().list2Dic(dic, transposed=True)
+            {(2,1): 1, (3,1): 2, (3,2): 3})
+        """
+        dic = {}
+        keys = dlist.keys()
+        for idw in keys:
+            for idc, tf in dlist[idw]:
+                if transposed:
+                    dic[(idc, idw)] = tf
+                else:
+                    dic[(idw, idc)] = tf
+            #del dlist[idw]
+        return dic
 
 
     def setFreq(self, key, newf):
@@ -619,6 +733,12 @@ class DictRels(AbstractDictionary):
         --------
         contexts : list
             A list containing all contexts of `key`
+
+        Example:
+        --------
+        >>> d = DictRels({(1,2): 1, (1,3): 2, (2,3): 3})
+        >>> d.getContexts(1)
+            [2, 3]
         """
         contexts = []
         for k in dict.iterkeys(self):

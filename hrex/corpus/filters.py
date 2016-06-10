@@ -16,7 +16,7 @@ from operator import itemgetter
 
 from structure import dictionaries
 
-def filter_topN(dic, top_N=1000):
+def filter_topN(dic, N=1000):
     """
     Filter out terms in a dictionary and keep only the topN 
     containing the greatest number of contexts.
@@ -25,7 +25,7 @@ def filter_topN(dic, top_N=1000):
     -----------
     dic : dictionaries.dictWords
         Dictionary in the form `word: (id, tf)`
-    top_N : int
+    N : int
         Number of terms in dictionary with more contexts
 
     Returns:
@@ -33,13 +33,13 @@ def filter_topN(dic, top_N=1000):
     dtopN : dictionaries.DictWords
         Dictionary containing only the top N terms
     """
-    logger.info('filtering top %d words from dictionary' % top_N)
+    logger.info('filtering top %d words from dictionary' % N)
     dtopN = dictionaries.DictWords()
     sizes = []
     for w in dic:
         id, tf = dic[w]
         sizes.append((w, tf))
-    ar_topN = sorted(sizes, key=itemgetter(1), reverse=True)[:top_N]
+    ar_topN = sorted(sizes, key=itemgetter(1), reverse=True)[:N]
     topNids = dict(ar_topN).keys()
     for w in topNids:
         idw, tf = dic[w]
@@ -70,3 +70,28 @@ def filterTF(dic, min_tf=5):
             dmin_tf[word] = (id, tf)
     logger.info('dictionary reduced from %d to %d words' % (len(dic), len(dmin_tf)))
     return dmin_tf
+
+
+def filterTopNContexts(dic, N=50):
+    """
+    Filter out contexts of the dictionary, keeping only the top N 
+    most associated contexts to each term. `dic` is filtered by
+    the weight associated between term and context.
+
+    Parameters:
+    -----------
+    dic : dictionaries.DictRels
+        Dictionary of relations in the form `(idw, idc): weight`
+    N : int
+        Number of associated contexts in the final dictionary
+
+    Returns:
+    --------
+    dftr : dictionaries.DictRels
+        Dictionary containing the filtered contexts
+    """
+    dftr = dictionaries.DictRels()
+    dw = dic.dic2List(key='idw', transposed=False)
+    for idw in dw:
+        dftr[idw] = sorted(dw[idw], key=itemgetter(1), reverse=True)[:N]
+    return dftr

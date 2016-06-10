@@ -16,6 +16,7 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 import os
 from os.path import join, splitext
 from collections import defaultdict
+import numpy as np
 
 from structure import dictionaries
 
@@ -72,6 +73,51 @@ class Corpus(object):
         self.dwords = dictionaries.DictWords()
         self.dctxs = dictionaries.DictWords()
         self.drels = dictionaries.DictRels()
+
+
+    def setDwords(self, dic):
+        """
+        Replace the values of `self.dwords` for the new dictionary
+        
+        Parameters:
+        -----------
+        dic : dictionaries.DictWords
+            The new dictionary
+        """
+        if isinstance(dic, dictionaries.DictWords):
+            self.dwords = dic
+        else:
+            logger.error('Cannot set dwords. `dic` not an instance of DictWords')
+
+
+    def setDctx(self, dic):
+        """
+        Replace the values of `self.dctxs` for the new dictionary
+        
+        Parameters:
+        -----------
+        dic : dictionaries.DictWords
+            The new dictionary
+        """
+        if isinstance(dic, dictionaries.DictWords):
+            self.dctxs = dic
+        else:
+            logger.error('Cannot set dctxs. `dic` not an instance of DictWords')
+
+
+    def setDrels(self, dic):
+        """
+        Replace the values of `self.drels` for the new dictionary
+        
+        Parameters:
+        -----------
+        dic : dictionaries.DictRels
+            The new dictionary
+        """
+        if isinstance(dic, dictionaries.DictRels):
+            self.drels = dic
+        else:
+            logger.error('Cannot set drels. `dic` not an instance of DictRels')
 
 
     def _documents(self, lex_mode='word', cwords=True, ctw='njv', normalize=True, lower=False):
@@ -251,7 +297,7 @@ class Corpus(object):
         return nb_words, nb_ctxs, nb_rels, sum_rels
 
 
-    def weightTerms(self, measure='ppmi', replace=False):
+    def weightRels(self, measure='ppmi', replace=False):
         """
         Calculate the weight for terms.
 
@@ -287,6 +333,68 @@ class Corpus(object):
             dweights[(idw, idc)] = weight
         if replace:
             self.drels = dweights
+        return dweights
+
+
+    def _normalize(self, dic):
+        """
+        Transform the values of dic into a Min-Max scaling [1], being
+        formulated as:
+
+        X_i = \frac{X_i - X_{min}}{X_{max} - X_{min}}
+
+        [1] Priddy, Kevin L. and Keller, Paul E. 2005. Artificial Neural 
+            Networks: An Introduction. SPIE Press - International Society 
+            for Optical Engineering, October 2005.
+
+        Parameters:
+        -----------
+        dic : dictionaries.DicWords
+            Dictionary containing the form `ctx: (ictx, weight)`
+        """
+        weights = np.asarray(dic.allFrequencies())
+        max_w = weights.max()
+        min_w = weights.min()
+        for idc in dic:
+            _, w = dic[idc]
+            minmax = (w - min_w) / (max_w - min_w)
+            dic.setFreq(idc, minmax)
+        return dic        
+
+
+    def weightContexts(self, measure='entropy', replace=False, normalize=True):
+        """
+        Calculate the weight for contexts.
+
+        Parameters:
+        -----------
+        measure : string {entropy}
+            entropy : Shannon entropy (base=2)
+        replace : boolean {True, False}
+            replace self.dctx with the weighted values
+        normalize : boolean {True, False}
+            apply max-min normalization over all values
+        """
+        from scipy.stats import entropy
+        from utils import mathutils
+           
+        if measure not in ['entropy']:
+             logger.error('cannot build dictionary: %s' % measure)
+             sys.exit(1)
+        dctxs_t = self.dctxs.id2key()
+        dweights = dictionaries.DictWords()
+
+        dlist = self.drels.dic2List(transposed=True)
+        for idc in dlist:
+            values = dict(dlist[idc]).values()
+            ctx, _ = dctxs_t[idc]
+            dweights[ctx] = (idc, entropy(values, base=2))
+
+        if normalize:
+            dweights = self._normalize(dweights)
+
+        if replace:
+            self.dctxs = dweights
         return dweights
 
 
