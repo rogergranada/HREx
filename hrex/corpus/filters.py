@@ -95,3 +95,47 @@ def filterTopNContexts(dic, N=50):
     for idw in dw:
         dftr[idw] = sorted(dw[idw], key=itemgetter(1), reverse=True)[:N]
     return dftr
+
+
+def filterDictionaries(dwords, dctxs, drels, dwf, startid=1):
+    """
+    Filter IDs from dictionaries keeping only terms contained in `dwf`.
+    Non-related contexts and relations are removed from `dctxs` and
+    `drels`.
+
+    Parameters:
+    -----------
+    dwf : dictionaries.DicWords
+        Dictionary of filtered words, being a subset of the `dwords`
+    startid : int
+        Initial id used in the dictionary
+
+    Returns:
+    ------
+    `dwfl` : dictionaries.DicWords
+        Dictionary containing the words from `dwf` with new ids
+    `dcfl` : dictionaries.DicWords
+        Dictionary containing the contexts of the words in `dwf`
+    `drfl` : dictionaries.DicRels
+        Dictionary containing the relations of the words in `dwf`
+    """
+    dctx_t = dctxs.id2key()
+    dwfl = dictionaries.DictWords(startid=startid)
+    dcfl = dictionaries.DictWords(startid=startid)
+    drfl = dictionaries.DictRels()
+
+    words = dwords.keys()
+    for w in sorted(words):
+        idw, _ = dwords[w]
+        lctx = drels.getContexts(idw)
+        for idc in lctx:
+            tf = drels[(idw, idc)]
+            ctx, _ = dctx_t[idc]
+            dcfl[ctx] = 1
+            dwfl[w] = 1
+            nidw, _ = dwfl[w]
+            nidc, _ = dcfl[ctx]
+            drfl[(nidw, nidc)] = tf
+            del drels[(idw, idc)]
+        del dwords[w]
+    return (dwfl, dcfl, drfl)

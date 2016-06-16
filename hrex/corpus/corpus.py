@@ -19,6 +19,7 @@ from collections import defaultdict
 import numpy as np
 
 from structure import dictionaries
+import filters
 
 class Corpus(object):
     """
@@ -434,4 +435,29 @@ class Corpus(object):
         self.dwords.load(fin, dname='dwords', mode=mode)
         self.dctxs.load(fin, dname='dctxs', mode=mode)
         self.drels.load(fin, dname='drels', mode=mode)
+
+
+    def filterDictionaries(self, dwf, startid=1):
+        """
+        Update IDs from dictionaries keeping only terms contained in `dwf`.
+        Non-related contexts and relations are removed from `self.ctxs` and
+        `self.drels`.
+
+        Parameters:
+        -----------
+        dwf : dictionaries.DicWords
+            dictionary of filtered words, being a subset of the `self.dwords`
+
+        Notes:
+        ------
+        `self.dwords` is replaced by `dwfl`
+        `self.dctxs` is replaced by `dcfl`
+        `self.drels` is replaced by `drfl`
+        """
+        dwfl, dcfl, drfl = filters.filterDictionaries(self.dwords, self.dctxs, 
+                                                      self.drels, dwf, startid=startid)
+
+        self.dwords = dwfl
+        self.dctxs = dcfl
+        self.drels = drfl
 #End of class Corpus
