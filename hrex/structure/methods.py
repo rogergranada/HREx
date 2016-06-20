@@ -181,6 +181,25 @@ class AbstractMethod(object):
             `H` is the hypernym and `h` is the hyponym term. 
         """
         return self.gsrels
+
+
+    def save(self, fname):
+        """
+        Save relations from self.rels` into a file `fname`. Output file has the 
+        form:
+            Hypernym_1 hyponym_1
+            Hypernym_2 hyponym_2
+            ...
+            Hypernym_n hyponym_n
+        
+        Parameters:
+        -----------
+        fname : string
+            Path to the output file.
+        """
+        with open(fname, 'w', 'utf-8') as fout:
+            for H, h in self.rels:
+                fout.write('%s %s\n' % (H, h))
 #End of class MethodInterface
 
 

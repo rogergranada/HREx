@@ -218,7 +218,7 @@ class AbstractDictionary(dict):
         elif mode == 'text':
             ftxt = PlainText(fout)
             comm = '%%word id frequency'
-            ftxt.save(self, dtype=dname, transposed=False)
+            ftxt.save(self, dtype=dtype, transposed=False)
             return True
         else:
             logger.error('Cannot save dictionary - `mode=%s` no specified' % mode)
@@ -258,6 +258,7 @@ class AbstractDictionary(dict):
         dbm.close()
         return True
 
+
     def stats(self):
         """
         Print stats about the dictionary.
@@ -272,7 +273,7 @@ class DictWords(AbstractDictionary):
     and the frequency of each word. It has the form:
         [word]: (id, freq)
     """
-    def __init__(self, input=None):
+    def __init__(self, input=None, startid=1):
         """
         Initiate the class SQLite.
 
@@ -280,12 +281,14 @@ class DictWords(AbstractDictionary):
         -----------
         input : string, optional
             A dictionary that is transformed into DictWords
+        startid : int
+            Initial id used in the dictionary
         """
         if input:
             AbstractDictionary.__init__(self, input=input)
         else:
             AbstractDictionary.__init__(self, input=input)
-            self.id = 1
+            self.id = startid
 
 
     def __setitem__(self, key, value):
