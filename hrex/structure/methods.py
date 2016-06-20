@@ -18,7 +18,7 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 
 from codecs import open
 from collections import namedtuple
-P = namedtuple('P', ['lex_mode', 'cwords', 'ctw', 'normalize', 'lower', 'window'])
+P = namedtuple('P', ['lex_mode', 'cwords', 'ctw', 'normalize', 'lower', 'window', 'N'])
 
 class AbstractMethod(object):
     """
@@ -62,7 +62,7 @@ class AbstractMethod(object):
             The list of parameters to be set
         """
         p = [('lex_mode', ''), ('cwords', True), ('ctw', ''), ('normalize', True), 
-             ('lower', True), ('window', 0)]
+             ('lower', True), ('window', 0), ('N', 0)]
         par = []
         for el, val in p:
             if default.has_key(el):

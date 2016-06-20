@@ -2,19 +2,19 @@
 #-*- coding: utf-8 -*-
 
 """
-This module runs the file `methods.slqs`
+This module runs the file `methods.dsim`
 
 @author: granada
 """
 import sys
 sys.path.insert(0, '..')
 import logging
-logger = logging.getLogger('run.slqs')
+logger = logging.getLogger('run.dsim')
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 from corpus.corpus import Corpus
 from corpus import filters
-from methods import slqs
+from methods import dsim
 from resources.wordnet import WordNet
 from structure.parameters import Parameters
 
@@ -24,7 +24,7 @@ def main(argv):
     p = Parameters(argv)
 
     # load DF class to get the default settings
-    method = slqs.SLQS()
+    method = dsim.DSim()
     dset = method.defaultSettings()
 
     # load corpus into Corpus class and load `corpus.dwords` with a window of size=5
@@ -34,9 +34,9 @@ def main(argv):
     corpus.extractWindow(size=dset.window, lex_mode=dset.lex_mode, cwords=dset.cwords, 
                          ctw=dset.ctw, normalize=dset.normalize, lower=dset.lower)
 
-    # weight relations using Local Mutual Information (LMI)
+    # weight relations using Positive Pointwise Mutual Information (PPMI)
     # replace=True changes the values of corpus.drels to the LMI values
-    corpus.weightRels(measure='lmi', replace=True)
+    corpus.weightRels(measure='ppmi', replace=True)
 
     # filter the dictionary of words keeping only words that appear in WordNet
     wn = WordNet()
@@ -48,21 +48,9 @@ def main(argv):
     # save the dictionary in a text file
     #dtopN.save(p.outputfile(), dtype='dwords', mode='text', new=True)
 
-    # keep only the N most related contexts and set the `corpus.drels` 
-    # to the limited word by context matrix. By default `dset.N` is
-    # set to 50.
-    dfiltered = filters.filterTopNContexts(corpus.drels, N=dset.N)
-    corpus.setDrels(dfiltered)
-
-    # calculate the entropy of each context, `replace=True` set the values of
-    # `corpus.dctxs` to the values of entropy. `normalize=True` applies min-max
-    # scaling on the contexts values 
-    corpus.weightContexts(measure='entropy', replace=True, normalize=True)
-
-    # load SLQS class with the topN dictionary and identify relations between words
-    # the contexts with their value of entropy and the relations between words and
-    # contexts
-    method = slqs.SLQS(dtopN, corpus.dctxs, corpus.drels)
+    # load Weeds class with the topN dictionary and identify relations between words
+    # `DSim` has two types of distributional similarity, `dsim.Weeds` and `dsim.ClarkDE`
+    method = dsim.Weeds(dtopN, corpus.drels)
     method.identifyRelations()
 
     # save relations into a file

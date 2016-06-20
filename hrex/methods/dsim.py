@@ -80,7 +80,9 @@ class DSim(AbstractMethod):
         self.gsrels : list
             A list containing the relations found in a gold standard.
         """
-        
+        default = {'window': 5, 'lex_mode':'lemma', 'cwords':True, 'ctw':'n', 
+                   'normalize':True, 'lower':True}
+        AbstractMethod.__init__(self, default=default)
         self.dwords = dwords
         self.drels = drels
 
