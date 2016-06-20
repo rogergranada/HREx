@@ -10,7 +10,13 @@ A method starts from a list of words, contexts and their frequencies
 
 @author: granada
 """
+import sys
+sys.path.insert(0, '..')
+import logging
+logger = logging.getLogger('structure.methods')
+logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
+from codecs import open
 from collections import namedtuple
 P = namedtuple('P', ['lex_mode', 'cwords', 'ctw', 'normalize', 'lower', 'window'])
 
@@ -197,6 +203,7 @@ class AbstractMethod(object):
         fname : string
             Path to the output file.
         """
+        logger.info('saving relations into file: %s' % fname)
         with open(fname, 'w', 'utf-8') as fout:
             for H, h in self.rels:
                 fout.write('%s %s\n' % (H, h))

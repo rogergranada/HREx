@@ -64,6 +64,9 @@ def main(argv):
     method = slqs.SLQS(dtopN, corpus.dctxs, corpus.drels)
     method.identifyRelations()
 
+    # save relations into a file
+    method.save(p.outputfile())
+
     # print Precision, Recall and F-measure based on WordNet
     logger.info('precision: %f' % method.precision(WordNet))
     logger.info('recall: %f' % method.recall(WordNet))
