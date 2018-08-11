@@ -59,3 +59,7 @@ data
 *.pyc~
 __pycache__
 .metadata
+
+# Temporary
+*.md~
+*.txt~
